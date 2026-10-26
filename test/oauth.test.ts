@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { build } from 'esbuild';
 import { Miniflare, convertV4MiniflareOptions, Response as MfResponse } from 'miniflare';
 import { createHash, randomBytes } from 'node:crypto';
+import { browserConsent, chromium } from './browser';
 import { isChatGptRedirect, isOwner, configured } from '../src/policy';
 
 const origin = 'https://owner.example';
@@ -93,7 +94,7 @@ describe('OAuth protocol and owner gate',()=>{
     const flow=await begin();
     const consent=await call(`/authorize?${flow.params}`);
     expect(consent.headers.get('referrer-policy')).toBe('same-origin');
-    expect(consent.headers.get('content-security-policy')).toContain("form-action 'self'");
+    expect(consent.headers.get('content-security-policy')).toBe("default-src 'none'; form-action 'self' https://github.com https://chatgpt.com; frame-ancestors 'none'; base-uri 'none'");
     const handle=(await consent.text()).match(/name="handle" value="([^"]+)"/)![1];
     const cookie=cookies(consent);
     const before=upstreamCalls;
@@ -109,6 +110,16 @@ describe('OAuth protocol and owner gate',()=>{
     expect(new URL(approved.headers.get('location')!).origin).toBe('https://github.com');
     expect(approved.headers.get('referrer-policy')).toBe('no-referrer');
   });
+  it.skipIf(!chromium)('browser follows consent approval redirect to GitHub', async()=>{
+    const flow=await begin();
+    const result=await browserConsent(call,`/authorize?${flow.params}`,'approve');
+    expect(result.destination).toBe('https://github.com');
+  },30000);
+  it.skipIf(!chromium)('browser follows consent cancellation redirect to ChatGPT', async()=>{
+    const flow=await begin();
+    const result=await browserConsent(call,`/authorize?${flow.params}`,'deny');
+    expect(result.destination).toBe('https://chatgpt.com');
+  },30000);
   it('cancels consent before any upstream identity request',async()=>{
     const f=await begin();const consent=await call(`/authorize?${f.params}`);
     const handle=(await consent.text()).match(/name="handle" value="([^"]+)"/)![1];

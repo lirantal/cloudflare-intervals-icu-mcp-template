@@ -11,7 +11,9 @@ export async function login(request: Request, env: Env): Promise<Response> {
       const description = await env.OAUTH_PROVIDER.describeConsent(auth);
       const consent = await env.OAUTH_PROVIDER.beginConsent(auth);
       consent.headers.set('content-type', 'text/html; charset=utf-8');
-      consent.headers.set('content-security-policy', "default-src 'none'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'");
+      // Chromium applies form-action to redirects too: approval goes to GitHub,
+      // cancellation goes to the validated ChatGPT callback.
+      consent.headers.set('content-security-policy', "default-src 'none'; form-action 'self' https://github.com https://chatgpt.com; frame-ancestors 'none'; base-uri 'none'");
       // no-referrer makes browser form POSTs send Origin: null. Keep the
       // same-origin Origin check usable without leaking auth URLs to GitHub.
       consent.headers.set('referrer-policy', 'same-origin');

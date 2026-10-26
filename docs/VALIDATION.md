@@ -19,7 +19,7 @@ The full MCP Worker and container image are **deployed** to the authorized examp
 
 - Node 24.22.0 and official `cf` 1.0.0-beta.23; dependencies installed with `npm ci`.
 - `npm run check` passes.
-- `npm test` passes: **17 tests**. Fourteen use real OAuth provider code in Miniflare/workerd with stub GitHub/container endpoints. Three test native container lifecycle behavior with mocked runtime APIs.
+- `npm test` passes: **19 tests**. Sixteen use real OAuth provider code in Miniflare/workerd with stub GitHub/container endpoints. Two of those sixteen drive the rendered consent page in Chromium through a loopback bridge to the real workerd fixture, intercepting GitHub/ChatGPT requests before network access. Three other tests cover native container lifecycle behavior with mocked runtime APIs.
 - OAuth coverage includes discovery, issuer identification, DCR callback restrictions, anonymous/forged bearer rejection, S256 PKCE, canonical audience, consent cancellation/browser binding, non-owner denial, owner authorization, credential stripping, session headers, Origin rejection, refresh/revocation, code replay, and authorization-version/scope policy.
 - Lifecycle coverage includes shared startup for concurrent requests, pinned image/lite instance selection, read-only runtime settings, native inactivity timeout restoration, replacement of an old image, and no replay of interrupted MCP calls.
 - Docker builds the pinned icuvisor commit `069f893e91819a454da80015df8f2ae6158707ae` using Go 1.26.10. Local Linux amd64 image: `sha256:6c950978f33eae9ab2674e71df89b1e1c0f7a89ef95ff2fe21345e06e16c2356`.
@@ -79,3 +79,13 @@ The first real ChatGPT connection reached the consent page, but Continue was rej
 The consent page now uses `Referrer-Policy: same-origin`, and the Worker response wrapper preserves it instead of overwriting it. All other responses still default to `no-referrer`. The consent POST still requires the exact canonical server Origin, and the OAuth provider still requires the browser-bound consent cookie/handle. A new integration regression verifies the final rendered policy and CSP, rejects missing/null/foreign origins (including ChatGPT itself as a POST origin), and allows the valid same-origin flow to redirect to GitHub. Cross-origin referrers remain suppressed. Type checking and all 17 tests pass. The user must start a fresh authorization flow after deployment; the already-loaded consent page retains its old policy.
 
 Consent fix deployed successfully as version `REDACTED_DEPLOYMENT_VERSION`; the deployments API confirms 100% traffic. Build and prebuilt dry run pass. Real browser acceptance is awaiting a fresh authorization attempt; the executor public-host allowlist limitation remains unchanged.
+
+## Browser consent redirect CSP failure
+
+After the Origin fix, the user's next authorization reached the consent page but Chromium blocked the form's cross-origin redirect under `form-action 'self'`. A second click then received an invalid/expired authorization response, consistent with the first POST having consumed the consent handle before its redirect was blocked.
+
+Two automated Chromium tests against the actual rendered workerd/provider fixture reproduced the exact console error before the fix, for both Continue and Cancel. The consent CSP now allows form navigation only to self, `https://github.com`, and `https://chatgpt.com`. Full origins are intentional because these services may redirect through sign-in and post-callback pages. Exact callback URI validation, strict same-origin consent POST checks, consent cookie/handle binding, S256 PKCE, canonical audience, and numeric owner validation remain enforced.
+
+The same browser tests pass after the CSP change. All **19 tests**, TypeScript checks, full build, and prebuilt dry run pass. The browser harness uses the system Chromium/Chrome binary (or `CHROMIUM_BIN`) and Node's built-in CDP WebSocket client; it forwards only loopback traffic to the test fixture and intercepts external navigation locally without real GitHub/ChatGPT access. CI and deployment workflows require the browser tests via `REQUIRE_BROWSER_TESTS=true` instead of silently skipping when no browser is available. Real account sign-in/tool discovery still require user acceptance with a fresh OAuth flow.
+
+CSP redirect fix deployed as version `REDACTED_DEPLOYMENT_VERSION`; Cloudflare deployments API confirms 100% traffic.

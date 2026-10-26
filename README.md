@@ -2,7 +2,7 @@
 
 A single-owner ChatGPT MCP connector: Cloudflare Worker + Workers OAuth Provider + Durable Object-managed container, building [icuvisor](https://github.com/ricardocabral/icuvisor) from pinned Go source. The target account is **example-account**, `REPLACE`. Data access is **read-only**, as requested. The owner is `lirantal` (GitHub ID `REPLACE`).
 
-**Current status:** Deployed to example-account. Type checks, 17 tests, source container build, the local Streamable HTTP smoke test (22 read-only tools), `cf build`, and the production dry run pass. Public smoke testing is blocked by the managed environment allowlist; real ChatGPT OAuth/tool discovery and non-owner browser checks remain pending. See [validation status](docs/VALIDATION.md).
+**Current status:** Deployed to example-account. Type checks, 19 tests, source container build, the local Streamable HTTP smoke test (22 read-only tools), `cf build`, and the production dry run pass. Public smoke testing is blocked by the managed environment allowlist; real ChatGPT OAuth/tool discovery and non-owner browser checks remain pending. See [validation status](docs/VALIDATION.md).
 
 ## Architecture
 
@@ -45,6 +45,8 @@ The Worker routes all authorized traffic to a single named owner Durable Object,
 - A GitHub account and a **GitHub OAuth App** (not a GitHub App installation).
 - Your intervals.icu athlete ID and API key.
 - An HTTPS Worker URL (`workers.dev` is sufficient; no purchased domain needed).
+
+Tests include real Chromium form navigation with stubbed GitHub/ChatGPT destinations. Install Chromium or Chrome (or set `CHROMIUM_BIN`) to run those two browser tests; CI requires them through `REQUIRE_BROWSER_TESTS=true`.
 
 Dependencies and the upstream source commit are pinned. `cf` is Cloudflare's official beta CLI, installed locally by `npm ci`; use `npx cf`. The compatible **beta Vite plugin** is intentional: its stable 1.x series does not read the new `cloudflare.config.ts` format. `cf` handles provisioning, container builds, and deployment. There is no hand-maintained Wrangler configuration.
 
