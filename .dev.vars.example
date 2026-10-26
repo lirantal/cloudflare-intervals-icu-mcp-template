@@ -1,0 +1,3 @@
+# Copy to .dev.vars. Dummy credentials work for discovery checks; real GitHub sign-in needs HTTPS.
+GITHUB_CLIENT_SECRET=replace-me
+INTERVALS_ICU_API_KEY=replace-me

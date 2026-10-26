@@ -1,0 +1,38 @@
+name: Deploy production
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      CF_SEND_TELEMETRY: 'false'
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - run: npm ci
+      - run: npm run preflight
+      - run: npm run check
+      - run: npm test
+      - run: npm run build
+      - run: npx cf deploy --prebuilt --mode production --dry-run
+      - run: docker build -t example-account-icuvisor:test .
+      - run: npm run test:container
+      - name: Deploy the verified build
+        run: npm run deploy -- --prebuilt --mode production
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: REPLACE
+          GITHUB_CLIENT_SECRET: ${{ secrets.OAUTH_GITHUB_CLIENT_SECRET }}
+          INTERVALS_ICU_API_KEY: ${{ secrets.INTERVALS_ICU_API_KEY }}
+      - name: Check public discovery and rejection of anonymous callers
+        run: node scripts/smoke.mjs "$(node -p 'JSON.parse(require("fs").readFileSync("deployment.json")).publicOrigin')"

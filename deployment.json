@@ -1,0 +1,12 @@
+{
+  "accountId": "REPLACE",
+  "workerName": "icuvisor-mcp",
+  "publicOrigin": "https://REPLACE.workers.dev",
+  "allowedGithubUserId": "REPLACE",
+  "githubClientId": "REPLACE",
+  "athleteId": "REPLACE",
+  "timezone": "UTC",
+  "deleteMode": "none",
+  "toolset": "core",
+  "authEpoch": "1"
+}
