@@ -38,7 +38,8 @@ export default {
     const response = await createProvider(env).fetch(request, env, ctx);
     const headers = new Headers(response.headers);
     headers.set('Cache-Control','no-store');
-    headers.set('Referrer-Policy','no-referrer');
+    // Preserve the consent page's same-origin policy for its browser POST.
+    if (!headers.has('Referrer-Policy')) headers.set('Referrer-Policy','no-referrer');
     headers.set('X-Content-Type-Options','nosniff');
     return new Response(response.body,{status:response.status,headers});
   },

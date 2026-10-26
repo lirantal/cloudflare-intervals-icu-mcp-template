@@ -12,7 +12,9 @@ export async function login(request: Request, env: Env): Promise<Response> {
       const consent = await env.OAUTH_PROVIDER.beginConsent(auth);
       consent.headers.set('content-type', 'text/html; charset=utf-8');
       consent.headers.set('content-security-policy', "default-src 'none'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'");
-      consent.headers.set('referrer-policy', 'no-referrer');
+      // no-referrer makes browser form POSTs send Origin: null. Keep the
+      // same-origin Origin check usable without leaking auth URLs to GitHub.
+      consent.headers.set('referrer-policy', 'same-origin');
       const e = escapeHtml;
       return new Response(`<!doctype html><html lang="en"><meta charset="utf-8"><title>Connect ICU Visor</title>
         <h1>Connect your intervals.icu data</h1><p>This server is restricted to its owner's GitHub identity.</p>

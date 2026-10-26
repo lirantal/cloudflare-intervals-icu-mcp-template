@@ -89,6 +89,26 @@ describe('OAuth protocol and owner gate',()=>{
     const bad=await call(`/authorize?${params}`);expect([302,400]).toContain(bad.status);
     if(bad.status===302)expect(bad.headers.get('location')).toContain('error=');
   });
+  it('preserves the browser consent referrer policy and rejects opaque or foreign POST origins', async()=>{
+    const flow=await begin();
+    const consent=await call(`/authorize?${flow.params}`);
+    expect(consent.headers.get('referrer-policy')).toBe('same-origin');
+    expect(consent.headers.get('content-security-policy')).toContain("form-action 'self'");
+    const handle=(await consent.text()).match(/name="handle" value="([^"]+)"/)![1];
+    const cookie=cookies(consent);
+    const before=upstreamCalls;
+    for(const invalidOrigin of [null, 'null', 'https://chatgpt.com', 'https://evil.example']) {
+      const post=form({handle,decision:'approve'},cookie);
+      const headers=new Headers(post.headers);
+      if(invalidOrigin===null) headers.delete('origin'); else headers.set('origin',invalidOrigin);
+      expect((await call('/authorize',{...post,headers})).status).toBe(403);
+    }
+    expect(upstreamCalls).toBe(before);
+    const approved=await call('/authorize',form({handle,decision:'approve'},cookie));
+    expect(approved.status).toBe(302);
+    expect(new URL(approved.headers.get('location')!).origin).toBe('https://github.com');
+    expect(approved.headers.get('referrer-policy')).toBe('no-referrer');
+  });
   it('cancels consent before any upstream identity request',async()=>{
     const f=await begin();const consent=await call(`/authorize?${f.params}`);
     const handle=(await consent.text()).match(/name="handle" value="([^"]+)"/)![1];
