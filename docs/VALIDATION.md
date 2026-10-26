@@ -8,7 +8,7 @@ The full MCP Worker and container image are **deployed** to the authorized examp
 - The user enabled Workers Paid after reviewing base and metered costs. The subscriptions API confirms `workers_paid` in state `Paid`. The implementation did not change billing.
 - Public origin: `https://icuvisor-mcp.example.workers.dev`.
 - Worker version: `REDACTED_DEPLOYMENT_VERSION`, confirmed at 100% in the deployments API.
-- Container image uploaded and prepared successfully: `sha256:8b6bf732474f2cb424249c757e5a41d1666f56fd2c9ddeeaebf826843eb73658`.
+- Container image uploaded and prepared successfully: `sha256:2c43079e483301d6a2639f0591923761dbe9d4d2d112397a27e9dc6a0eaefc8b` (pinned source plus stateless transport patch).
 - OAuth KV namespace provisioned: `REDACTED_RESOURCE_ID`.
 - SQLite Durable Object namespace: `REDACTED_RESOURCE_ID`.
 - Both `GITHUB_CLIENT_SECRET` and `INTERVALS_ICU_API_KEY` were entered in the dashboard. Metadata-only checks after full deployment confirm both remain `secret_text`. Their values were not printed or saved locally.
@@ -107,3 +107,13 @@ Inspection of the pinned Go SDK found that modern `server/discover` requires the
 The proxy now preserves `Mcp-Method`, `Mcp-Name`, and the standard `Mcp-Param-*` header family while still stripping credentials, cookies, unrelated mcp-* fields, and forwarding headers. A real-provider integration test verifies these forwarding/stripping rules. The real-container smoke test now checks modern server/discover as well as legacy initialization and 22 read-only tools, with a dummy key and no intervals.icu API calls. Type checking and all 20 tests pass. Existing short-lived diagnostics remain enabled for the acceptance attempt and must be disabled/removed after diagnosis.
 
 Protocol-header fix deployed as version `REDACTED_DEPLOYMENT_VERSION`; deployments API confirms 100% traffic. Build and dry run pass. User has been asked to Refresh tools on the existing authenticated app. The bounded diagnostics now recognize server/discover and 2026-07-28 structural metadata without persisting request values.
+
+## Stateless HTTP compatibility
+
+The header fix changed real `server/discover` from HTTP 400 to HTTP 200, as confirmed by the bounded live probe. That request used protocol `2026-07-28`. ChatGPT still did not follow with initialize or tools/list. The pinned server's stateful transport advertised only older protocol versions. Its Go SDK supports 2026-07-28 only with `Stateless: true`; the pinned icuvisor CLI has no configuration flag exposing that setting.
+
+The build now applies `patches/icuvisor-stateless-http.patch` to the same pinned source. It changes one transport-options line to `Stateless: true, JSONResponse: true`. Docker runs `git apply --check` before applying it. The patch is explicitly included in the otherwise restrictive Docker context; credentials and ignored files remain excluded. The binary version is suffixed `+stateless-http` to identify the local modification.
+
+The managed executor disconnected during the first compilation attempt. After it recovered, the image was found fully built. The expanded real-container smoke test passes: current server/discover advertises 2026-07-28; current tools/list returns 22 read-only tools; legacy initialize/initialized/tools-list still returns the same tools; no MCP session ID is issued. Only a dummy API key was used and no intervals.icu API requests were made. Local image ID: `sha256:d529c04d04bc2974dfd288e0ed39edfcf37909b6b24b3ea8050000c3a41639cd`. Type checking and all 20 tests also pass. Live ChatGPT discovery acceptance remains pending deployment of this image and a new refresh attempt.
+
+Stateless image deployed successfully as Worker version `REDACTED_DEPLOYMENT_VERSION`, confirmed at 100% through the deployments API. Full `cf build` and prebuilt production dry run passed before deployment. The user has been asked to refresh tools on the existing app; live acceptance is pending.

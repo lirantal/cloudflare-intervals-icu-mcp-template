@@ -9,9 +9,14 @@ RUN --mount=type=secret,id=proxy_ca \
     git init . && git remote add origin https://github.com/ricardocabral/icuvisor.git && \
     git fetch --depth=1 origin "$ICUVISOR_COMMIT" && git checkout --detach FETCH_HEAD && \
     test "$(git rev-parse HEAD)" = "$ICUVISOR_COMMIT"
+# The pinned CLI does not expose stateless HTTP. Its SDK supports the current
+# protocol only in stateless mode; apply this reviewed one-line transport patch.
+COPY patches/icuvisor-stateless-http.patch /tmp/icuvisor-stateless-http.patch
+RUN git apply --check /tmp/icuvisor-stateless-http.patch && \
+    git apply /tmp/icuvisor-stateless-http.patch && rm /tmp/icuvisor-stateless-http.patch
 RUN --mount=type=secret,id=proxy_ca \
     if [ -f /run/secrets/proxy_ca ]; then export SSL_CERT_FILE=/run/secrets/proxy_ca; fi; \
-    CGO_ENABLED=0 go build -trimpath -ldflags="-s -w -X main.version=$ICUVISOR_COMMIT" -o /out/icuvisor ./cmd/icuvisor
+    CGO_ENABLED=0 go build -trimpath -ldflags="-s -w -X main.version=$ICUVISOR_COMMIT+stateless-http" -o /out/icuvisor ./cmd/icuvisor
 FROM gcr.io/distroless/static-debian12:nonroot
 COPY --from=build /out/icuvisor /usr/local/bin/icuvisor
 COPY --from=build /src/LICENSE /usr/share/doc/icuvisor/LICENSE

@@ -1,0 +1,11 @@
+--- a/internal/mcp/transport.go
++++ b/internal/mcp/transport.go
+@@ -164,7 +164,7 @@
+ 
+ 	streamableHandler := NewStreamableHTTPHandler(func(*http.Request) (*Server, error) {
+ 		return s, nil
+-	}, StreamableHTTPHandlerOptions{Logger: logger})
++	}, StreamableHTTPHandlerOptions{Logger: logger, Stateless: true, JSONResponse: true})
+ 	mux := http.NewServeMux()
+ 	mux.Handle(StreamableHTTPPath, streamableHandler)
+ 	httpServer := &http.Server{
