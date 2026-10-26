@@ -1,4 +1,3 @@
-import { getContainer } from '@cloudflare/containers';
 import type { Env, Props } from './env';
 import { isOwner } from './policy';
 export async function proxyMcp(request: Request, env: Env, props: Props): Promise<Response> {
@@ -19,7 +18,7 @@ export async function proxyMcp(request: Request, env: Env, props: Props): Promis
     body: request.body, redirect: 'manual', signal: request.signal,
   });
   try {
-    const response = await getContainer(env.MCP_CONTAINER, 'owner').fetch(upstream);
+    const response = await env.MCP_CONTAINER.getByName('owner').fetch(upstream);
     const output = new Headers(response.headers);
     output.set('Cache-Control', 'no-store');
     // Do not follow or relay an unexpected backend redirect.

@@ -3,9 +3,8 @@ import settings from './deployment.json' with { type: 'json' };
 
 const container = defineContainer({
   name: `${settings.workerName}-server`,
-  image: { dockerfile: './Dockerfile' },
-  instanceType: 'lite',
-  maxInstances: 1,
+  schedulingPolicy: 'durable-object',
+  images: { server: { dockerfile: './Dockerfile' } },
 });
 
 export default defineConfig({
@@ -21,7 +20,9 @@ export default defineConfig({
     exports: { IcuvisorContainer: exports.durableObject({ storage: 'sqlite', container }) },
     env: {
       OAUTH_KV: bindings.kv(),
-      MCP_CONTAINER: bindings.durableObject({ worker: settings.workerName, exportName: 'IcuvisorContainer' }),
+      // cf beta emits script_name even for same-Worker bindings; its new
+      // container validator rejects that. Use native upload metadata until fixed.
+      MCP_CONTAINER: { type: 'unsafe:durable_object_namespace', class_name: 'IcuvisorContainer' },
       PUBLIC_ORIGIN: bindings.text(settings.publicOrigin),
       ALLOWED_GITHUB_USER_ID: bindings.text(settings.allowedGithubUserId),
       GITHUB_CLIENT_ID: bindings.text(settings.githubClientId),

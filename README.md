@@ -2,7 +2,7 @@
 
 A single-owner ChatGPT MCP connector: Cloudflare Worker + Workers OAuth Provider + Durable Object-managed container, building [icuvisor](https://github.com/ricardocabral/icuvisor) from pinned Go source. The target account is **example-account**, `REPLACE`. Data access is **read-only**, as requested. The owner is `lirantal` (GitHub ID `REPLACE`).
 
-**Current status:** OAuth integration tests and type checks pass. Live deployment and the full image smoke test are pending credentials and a network allowlist update; see [validation status](docs/VALIDATION.md).
+**Current status:** Deployed to example-account. Type checks, 16 tests, source container build, the local Streamable HTTP smoke test (22 read-only tools), `cf build`, and the production dry run pass. Public smoke testing is blocked by the managed environment allowlist; real ChatGPT OAuth/tool discovery and non-owner browser checks remain pending. See [validation status](docs/VALIDATION.md).
 
 ## Architecture
 
@@ -36,7 +36,7 @@ The Worker is both the MCP authorization server and resource gateway. GitHub onl
 
 Cloudflare Access is unnecessary for this design. A generic Access login page in front of `/mcp`, `/token`, or `/.well-known/*` would interrupt protocol discovery and bearer-token requests. The container has no independent public hostname, port mapping, ingress route, or bypass URL. Only authorized Worker requests invoke its Durable Object binding.
 
-A single named container preserves Go's in-memory HTTP sessions while it runs. It sleeps after ten minutes without requests, with a maximum of one instance. A long-lived SSE connection may extend its lifetime. Restart/deploy/sleep loses MCP sessions; reconnect/reinitialize on session errors. There is no transparent retry of tool requests.
+The Worker routes all authorized traffic to a single named owner Durable Object, preserving Go's in-memory HTTP sessions while its container runs. The native Container API sets a ten-minute inactivity timeout. This account requires the `durable_object` scheduling policy, which does not support an application-level `max_instances` limit; the single instance is enforced by routing in application code. A long-lived SSE connection may extend its lifetime. The Durable Object selects the digest-pinned `server` image and `lite` instance size at startup, restores the inactivity timeout after eviction, and replaces an old image when handling the next request after deployment. Restart/deploy/sleep loses MCP sessions; reconnect/reinitialize on session errors. There is no transparent retry of tool requests.
 
 ## Requirements
 
@@ -84,6 +84,8 @@ Dependencies and the upstream source commit are pinned. `cf` is Cloudflare's off
    chmod 600 .dev.vars
    ```
 
+   Alternatively, create a minimal setup Worker at the final name and enter both values as **Secret** entries in its dashboard. A full deployment without `--secrets-file` or secret environment variables preserves those saved secrets; do not copy dashboard secret values into configuration files.
+
    The intervals.icu key comes from its settings/API page. It may itself allow writes; the server is configured to register read-only tools only. No secret is a Docker build argument or image layer. The container receives the API key through its Durable Object's runtime environment.
 
 5. Verify and deploy:
@@ -100,7 +102,7 @@ Dependencies and the upstream source commit are pinned. `cf` is Cloudflare's off
    npm run smoke -- https://icuvisor-mcp.YOUR-SUBDOMAIN.workers.dev
    ```
 
-   `cf` auto-provisions the KV binding, SQLite Durable Object namespace, and Container application in the selected account. The preflight deliberately rejects placeholders, account overrides, and a write-enabled safety mode. After the first deploy, `npm run deploy` preserves existing deployed secrets unless you pass `--secrets-file` or supply **both** secret environment variables. With environment variables, the deployment script creates a temporary mode-0600 secrets file under ignored `work/`, removes it afterward, and strips those variables from the build/deploy child process.
+   `cf` auto-provisions the KV binding, SQLite Durable Object namespace, and Container application in the selected account. The pinned beta CLI emits a conflicting cross-Worker field for self-bindings; `cloudflare.config.ts` uses the supported unsafe-metadata escape hatch for the local Durable Object binding until that CLI issue is fixed. The preflight deliberately rejects placeholders, account overrides, and a write-enabled safety mode. After the first deploy, `npm run deploy` preserves existing deployed secrets unless you pass `--secrets-file` or supply **both** secret environment variables. With environment variables, the deployment script creates a temporary mode-0600 secrets file under ignored `work/`, removes it afterward, and strips those variables from the build/deploy child process.
 
    If your Worker name or account Workers subdomain changes, update `publicOrigin` and the GitHub callback together before deploying. Custom domains require adding the domain to `cloudflare.config.ts` and using that origin consistently. Preview URLs are disabled.
 
@@ -139,8 +141,8 @@ Scope the Cloudflare token to example-account. It needs the current API permissi
 - **Logging:** Worker observability is disabled to avoid collecting OAuth callback query strings. Do not add request URL/body/header logging: these can contain codes, cookies, tokens, health data, or API results. Cloudflare/GitHub may still retain platform security/audit information.
 - **OAuth storage:** the maintained provider stores clients, grants and encrypted transaction data in KV. Its cookie binding and PKCE prevent cross-browser callback theft. KV's eventual consistency means simultaneous redemption is not a globally atomic single-use guarantee; this project does not claim otherwise. See the provider's upstream-sign-in documentation.
 - **Exposure:** public discovery/registration/token endpoints are necessary. They reveal no training data but can receive traffic and consume quota. DCR is restricted to ChatGPT callbacks; this does not prove the registrant is OpenAI. Your identity check remains the authorization boundary. Add Cloudflare rate limits if real abuse appears, keeping discovery and ChatGPT's OAuth flow reachable.
-- **Cost:** Workers paid-plan charges plus Containers CPU/memory/disk and applicable KV/DO usage. One container and idle sleep reduce idle use but do not impose a hard spend cap. Review current Cloudflare pricing during provisioning.
-- **Local development:** `npm run dev` launches the Cloudflare development tooling. The strict canonical HTTPS origin and secure browser cookies are intentional. Unit/integration tests work without a public URL; real browser OAuth needs the configured HTTPS deployment, or an explicitly configured HTTPS development endpoint and separate GitHub app. Do not expose a naked Docker port publicly.
+- **Cost:** Workers paid-plan charges plus Containers CPU/memory/disk and applicable KV/DO usage. Single-owner routing and idle sleep reduce idle use but do not impose a hard spend cap. Review current Cloudflare pricing during provisioning.
+- **Local development:** `npm run dev` launches the Cloudflare development tooling. The beta CLI local-binding escape hatch may require a local simulation plugin; the Miniflare OAuth integration tests use an explicit stub binding and are the verified local workflow. The strict canonical HTTPS origin and secure browser cookies are intentional. Unit/integration tests work without a public URL; real browser OAuth needs the configured HTTPS deployment, or an explicitly configured HTTPS development endpoint and separate GitHub app. Do not expose a naked Docker port publicly.
 
 ## Sources
 
