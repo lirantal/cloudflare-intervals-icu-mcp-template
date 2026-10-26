@@ -35,20 +35,7 @@ export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     if (!configured(env)) return new Response('Server setup incomplete', {status:503});
     if (new URL(request.url).origin !== env.PUBLIC_ORIGIN) return new Response('Unknown origin', {status:421});
-    const diagnostic = Date.now() < Number(env.MCP_DIAGNOSTICS_UNTIL) && new URL(request.url).pathname === '/mcp';
-    const record = async (status: number, outcome: 'response' | 'exception' | 'received') => {
-      if (!diagnostic) return;
-      const origin = request.headers.get('origin');
-      const originCategory = origin === null ? 'none' : origin === env.PUBLIC_ORIGIN ? 'self' : origin === 'https://chatgpt.com' ? 'chatgpt' : origin === 'null' ? 'opaque' : 'other';
-      const method = ['GET','POST','DELETE','OPTIONS'].includes(request.method) ? request.method.toLowerCase() : 'other';
-      try { await env.OAUTH_KV.put('diagnostic:mcp:gateway-'+method, JSON.stringify({at:new Date().toISOString(),status,outcome,
-        hasAuthorization:request.headers.has('authorization'),originCategory}), {expirationTtl:600}); } catch { /* no effect on MCP */ }
-    };
-    await record(0,'received');
-    let response:Response;
-    try { response = await createProvider(env).fetch(request, env, ctx); }
-    catch (error) { await record(500,'exception'); throw error; }
-    await record(response.status,'response');
+    const response = await createProvider(env).fetch(request, env, ctx);
     const headers = new Headers(response.headers);
     headers.set('Cache-Control','no-store');
     // Preserve the consent page's same-origin policy for its browser POST.

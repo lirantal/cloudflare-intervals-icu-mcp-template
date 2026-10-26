@@ -1,6 +1,6 @@
 # Validation status — 2026-10-27
 
-The full MCP Worker and container image are **deployed** to the authorized example-account account. Real GitHub OAuth sign-in through ChatGPT has succeeded. Public HTTP smoke testing, real ChatGPT tool discovery, and real non-owner rejection are **not yet verified**.
+The full MCP Worker and container image are **deployed** to the authorized example-account account. Real GitHub OAuth sign-in through ChatGPT has succeeded. ChatGPT tool refresh has completed without an error and the live probe captured server/discover followed by tools/list. A real intervals.icu data query, executor public smoke test, and real non-owner rejection are **not yet verified**.
 
 ## Production state
 
@@ -117,3 +117,9 @@ The build now applies `patches/icuvisor-stateless-http.patch` to the same pinned
 The managed executor disconnected during the first compilation attempt. After it recovered, the image was found fully built. The expanded real-container smoke test passes: current server/discover advertises 2026-07-28; current tools/list returns 22 read-only tools; legacy initialize/initialized/tools-list still returns the same tools; no MCP session ID is issued. Only a dummy API key was used and no intervals.icu API requests were made. Local image ID: `sha256:d529c04d04bc2974dfd288e0ed39edfcf37909b6b24b3ea8050000c3a41639cd`. Type checking and all 20 tests also pass. Live ChatGPT discovery acceptance remains pending deployment of this image and a new refresh attempt.
 
 Stateless image deployed successfully as Worker version `REDACTED_DEPLOYMENT_VERSION`, confirmed at 100% through the deployments API. Full `cf build` and prebuilt production dry run passed before deployment. The user has been asked to refresh tools on the existing app; live acceptance is pending.
+
+## Discovery acceptance and diagnostic cleanup
+
+The user confirmed Refresh tools took several seconds and completed without an error after the stateless update. Live fixed-metadata records show 2026-07-28 server/discover returning HTTP 200 JSON with no session ID, followed by a tools/list request; the gateway returned HTTP 200. A real intervals.icu query still needs user verification. Suggested checks are a visible get_athlete_profile app call reporting the configured athlete ID, followed by three recent activities compared with the intervals.icu UI. No API key, token, or raw health-data response needs to be shared in this development chat.
+
+Temporary diagnostic code, environment binding, configuration timestamp, and lifecycle stage instrumentation have been removed from source and deployed. The modern header allowlist and stateless transport changes remain. OAuth records and saved runtime secrets are preserved. Cleanup version: `REDACTED_DEPLOYMENT_VERSION`. Type checks, all 20 tests, build, and prebuilt dry run passed before deployment. Deleted the 3 remaining diagnostic KV records using a fixed diagnostic-only prefix and explicit key-name allowlist; no OAuth keys were enumerated or deleted.

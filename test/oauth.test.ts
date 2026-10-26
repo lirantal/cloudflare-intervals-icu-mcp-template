@@ -20,7 +20,7 @@ beforeAll(async()=>{
   mf = new Miniflare({...convertV4MiniflareOptions({modules:true,script:result.outputFiles[0].text,compatibilityDate:'2026-10-26',compatibilityFlags:['nodejs_compat'],
     kvNamespaces:['OAUTH_KV'],durableObjects:{MCP_CONTAINER:'FakeContainer'},
     bindings:{PUBLIC_ORIGIN:origin,ALLOWED_GITHUB_USER_ID:'12345',GITHUB_CLIENT_ID:'test-client',GITHUB_CLIENT_SECRET:'test-secret',
-      MCP_DIAGNOSTICS_UNTIL:String(Date.now()+3600000),INTERVALS_ICU_API_KEY:'test-key',INTERVALS_ICU_ATHLETE_ID:'i12345',AUTH_EPOCH:'1',ICUVISOR_DELETE_MODE:'none'},
+      INTERVALS_ICU_API_KEY:'test-key',INTERVALS_ICU_ATHLETE_ID:'i12345',AUTH_EPOCH:'1',ICUVISOR_DELETE_MODE:'none'},
     outboundService:async (request)=>{
       upstreamCalls++;
       if (request.url === 'https://github.com/login/oauth/access_token') {
@@ -72,8 +72,7 @@ describe('OAuth protocol and owner gate',()=>{
       const r=await call('/mcp',{method});expect(r.status).toBe(401);expect(r.headers.get('www-authenticate')).toContain('resource_metadata=');
     }
     expect(upstreamCalls).toBe(before);
-    const gateway=JSON.parse((await (await mf.getKVNamespace('OAUTH_KV')).get('diagnostic:mcp:gateway-post','text'))!);
-    expect(gateway).toEqual({at:expect.any(String),status:401,outcome:'response',hasAuthorization:false,originCategory:'none'});
+
   });
   it('publishes resource, issuer identification, DCR and S256 metadata',async()=>{
     const resource=await (await call('/.well-known/oauth-protected-resource/mcp')).json() as any;
@@ -148,9 +147,6 @@ describe('OAuth protocol and owner gate',()=>{
     const mcp=await call('/mcp',{method:'POST',headers:{authorization:`Bearer ${token.access_token}`,cookie:'secret=cookie','x-forwarded-user':'spoof',origin:'https://chatgpt.com','content-type':'application/json',accept:'application/json, text/event-stream','mcp-protocol-version':'2025-06-18','mcp-session-id':'session'},body:'{"jsonrpc":"2.0","method":"tools/list","id":1}'});
     expect(mcp.status).toBe(200);
     expect((await call('/mcp',{headers:{authorization:`Bearer ${token.access_token}`,origin:'https://evil.example'}})).status).toBe(403);
-    const diagnostic=JSON.parse((await (await mf.getKVNamespace('OAUTH_KV')).get('diagnostic:mcp:tools-list','text'))!);
-    expect(diagnostic).toEqual({method:'tools/list',shape:'object',batchSize:0,batchMethods:['tools/list'],protocolVersion:'unspecified',phase:'response',at:expect.any(String),status:200,
-      mediaType:'json',hasSession:false,elapsedMs:expect.any(Number),failure:null});
     const echoed=await mcp.json() as any;
     expect(echoed.url).toBe('http://localhost:8080/mcp');expect(echoed.headers.authorization).toBeUndefined();expect(echoed.headers.cookie).toBeUndefined();expect(echoed.headers['x-forwarded-user']).toBeUndefined();expect(echoed.headers['mcp-session-id']).toBe('session');
     const refreshed=await call('/token',form({grant_type:'refresh_token',client_id:f.client.client_id,refresh_token:token.refresh_token,resource:`${origin}/mcp`}));expect(refreshed.status).toBe(200);

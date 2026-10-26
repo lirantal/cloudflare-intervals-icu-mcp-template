@@ -8,6 +8,5 @@
   "timezone": "UTC",
   "deleteMode": "none",
   "toolset": "core",
-  "authEpoch": "1",
-  "diagnosticsUntil": "1793059697951"
+  "authEpoch": "1"
 }

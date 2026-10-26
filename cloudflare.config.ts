@@ -31,7 +31,6 @@ export default defineConfig({
       ICUVISOR_DELETE_MODE: bindings.text(settings.deleteMode),
       ICUVISOR_TOOLSET: bindings.text(settings.toolset),
       AUTH_EPOCH: bindings.text(settings.authEpoch),
-      MCP_DIAGNOSTICS_UNTIL: bindings.text(settings.diagnosticsUntil),
       GITHUB_CLIENT_SECRET: bindings.secret(),
       INTERVALS_ICU_API_KEY: bindings.secret(),
     },

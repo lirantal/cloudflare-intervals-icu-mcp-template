@@ -2,7 +2,7 @@
 
 A single-owner ChatGPT MCP connector: Cloudflare Worker + Workers OAuth Provider + Durable Object-managed container, building [icuvisor](https://github.com/ricardocabral/icuvisor) from pinned Go source. The target account is **example-account**, `REPLACE`. Data access is **read-only**, as requested. The owner is `lirantal` (GitHub ID `REPLACE`).
 
-**Current status:** Deployed to example-account. Type checks, 20 tests, source container build, the local Streamable HTTP smoke test (22 read-only tools), `cf build`, and the production dry run pass. Public smoke testing is blocked by the managed environment allowlist; real GitHub sign-in through ChatGPT succeeded, while tools discovery and non-owner browser checks remain pending. See [validation status](docs/VALIDATION.md).
+**Current status:** Deployed to example-account. Type checks, 20 tests, source container build, the local Streamable HTTP smoke test (22 read-only tools), `cf build`, and the production dry run pass. Public smoke testing is blocked by the managed environment allowlist; real GitHub sign-in and ChatGPT tool refresh succeeded. A real intervals.icu data query and non-owner browser checks remain pending. See [validation status](docs/VALIDATION.md).
 
 ## Architecture
 
