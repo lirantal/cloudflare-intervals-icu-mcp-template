@@ -2,7 +2,7 @@
 
 A single-owner ChatGPT MCP connector: Cloudflare Worker + Workers OAuth Provider + Durable Object-managed container, building [icuvisor](https://github.com/ricardocabral/icuvisor) from pinned Go source. The target account is **example-account**, `REPLACE`. Data access is **read-only**, as requested. The owner is `lirantal` (GitHub ID `REPLACE`).
 
-**Current status:** Deployed to example-account. Type checks, 19 tests, source container build, the local Streamable HTTP smoke test (22 read-only tools), `cf build`, and the production dry run pass. Public smoke testing is blocked by the managed environment allowlist; real ChatGPT OAuth/tool discovery and non-owner browser checks remain pending. See [validation status](docs/VALIDATION.md).
+**Current status:** Deployed to example-account. Type checks, 20 tests, source container build, the local Streamable HTTP smoke test (22 read-only tools), `cf build`, and the production dry run pass. Public smoke testing is blocked by the managed environment allowlist; real GitHub sign-in through ChatGPT succeeded, while tools discovery and non-owner browser checks remain pending. See [validation status](docs/VALIDATION.md).
 
 ## Architecture
 
@@ -139,7 +139,7 @@ Scope the Cloudflare token to example-account. It needs the current API permissi
 
 - **Emergency lockout:** change `authEpoch` in `deployment.json`, redeploy. The owner/scope/version check rejects old tokens on every MCP call and token refresh. Changing the allowed GitHub ID also rejects prior grants. Updating a config file alone does not revoke anything until deployed. Requests already in progress may finish.
 - **Secrets:** rotate with another deployment using `--secrets-file .dev.vars`. Restart/deploy the container so its runtime environment picks up a changed intervals.icu key. Change `authEpoch` when invalidating ChatGPT authorizations. Removing the GitHub OAuth App alone does not revoke already-issued Worker tokens.
-- **Sessions:** a container restart loses Go's sessions. Reconnect ChatGPT if a session expires. SSE data is streamed through, not buffered; session/protocol/event headers are preserved.
+- **Sessions:** a container restart loses Go's sessions. Reconnect ChatGPT if a session expires. SSE data is streamed through, not buffered; session/protocol/event headers are preserved, including `Mcp-Method`, `Mcp-Name`, and schema-annotated `Mcp-Param-*` metadata required by modern clients.
 - **Logging:** Worker observability is disabled to avoid collecting OAuth callback query strings. Do not add request URL/body/header logging: these can contain codes, cookies, tokens, health data, or API results. Cloudflare/GitHub may still retain platform security/audit information.
 - **OAuth storage:** the maintained provider stores clients, grants and encrypted transaction data in KV. Its cookie binding and PKCE prevent cross-browser callback theft. KV's eventual consistency means simultaneous redemption is not a globally atomic single-use guarantee; this project does not claim otherwise. See the provider's upstream-sign-in documentation.
 - **Exposure:** public discovery/registration/token endpoints are necessary. They reveal no training data but can receive traffic and consume quota. DCR is restricted to ChatGPT callbacks; this does not prove the registrant is OpenAI. Your identity check remains the authorization boundary. Add Cloudflare rate limits if real abuse appears, keeping discovery and ChatGPT's OAuth flow reachable.

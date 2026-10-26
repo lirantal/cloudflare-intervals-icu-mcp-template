@@ -14,5 +14,6 @@ export interface Env {
   ICUVISOR_DELETE_MODE: string;
   ICUVISOR_TOOLSET: string;
   AUTH_EPOCH: string;
+  MCP_DIAGNOSTICS_UNTIL?: string;
 }
 export interface Props { githubUserId: string; authEpoch: string; scope: string[] }

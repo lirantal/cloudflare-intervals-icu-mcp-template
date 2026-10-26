@@ -26,5 +26,12 @@ try{
   const list=await parse(await post({jsonrpc:'2.0',id:2,method:'tools/list'}));
   assert.ok(list.result?.tools?.length>0,'No tools discovered');
   for(const tool of list.result.tools)assert.equal(tool.annotations?.readOnlyHint,true,`${tool.name} is not annotated read-only`);
-  console.log(`Container initialized and listed ${list.result.tools.length} read-only tools with a dummy API key; no intervals.icu API calls made.`);
+  // Current ChatGPT clients can probe server/discover before legacy initialize.
+  // A missing Mcp-Method header causes a JSON-RPC header-mismatch HTTP 400.
+  const discovery=await parse(await fetch(endpoint,{method:'POST',headers:{'content-type':'application/json',accept:'application/json, text/event-stream',
+    'mcp-protocol-version':'2026-07-28','mcp-method':'server/discover'},body:JSON.stringify({jsonrpc:'2.0',id:3,method:'server/discover',
+      params:{_meta:{'io.modelcontextprotocol/protocolVersion':'2026-07-28',
+        'io.modelcontextprotocol/clientCapabilities':{},'io.modelcontextprotocol/clientInfo':{name:'container-smoke',version:'1'}}}}),signal:AbortSignal.timeout(10000)}));
+  assert.ok(discovery.result?.supportedVersions?.includes('2025-06-18'),'Modern discovery must advertise a supported stateful protocol');
+  console.log(`Container passed modern discovery, initialized, and listed ${list.result.tools.length} read-only tools with a dummy API key; no intervals.icu API calls made.`);
 }finally{spawnSync('docker',['rm','--force',name],{stdio:'ignore'});}

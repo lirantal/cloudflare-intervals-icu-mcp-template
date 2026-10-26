@@ -20,41 +20,48 @@ export class IcuvisorContainer extends DurableObject<Env> {
     // scheduling policy has no application-level max_instances setting.
     if (!this.ready) {
       this.ready = (async () => {
-        const image = container.images.server;
-        if (!image) throw new Error('Container image missing');
-        // New Worker versions must not keep serving an older image indefinitely.
-        if (container.running && (await container.inspect())?.image !== image) {
-          await container.destroy();
-        }
-        if (!container.running) {
-          container.start({
-            image, instance: 'lite', enableInternet: true,
-            env: {
-              INTERVALS_ICU_API_KEY: this.env.INTERVALS_ICU_API_KEY,
-              INTERVALS_ICU_ATHLETE_ID: this.env.INTERVALS_ICU_ATHLETE_ID,
-              ICUVISOR_TIMEZONE: this.env.ICUVISOR_TIMEZONE,
-              ICUVISOR_DELETE_MODE: 'none',
-              ICUVISOR_TOOLSET: this.env.ICUVISOR_TOOLSET,
-              ICUVISOR_COACH_MODE: 'off',
-            },
-          });
-        }
-        await container.setInactivityTimeout(IDLE_TIMEOUT_MS);
-        const deadline = Date.now() + 30_000;
-        for (;;) {
-          try {
-            // An unauthenticated GET to a non-MCP path only checks HTTP readiness.
-            // A 404 is sufficient; never retry an actual MCP request.
-            const response = await container.getTcpPort(8080).fetch('http://localhost:8080/', {
-              signal: AbortSignal.timeout(2000), redirect: 'manual',
-            });
-            await response.body?.cancel();
-            return;
-          } catch {
-            if (Date.now() >= deadline) throw new Error('Container startup timed out');
-            await new Promise(resolve => setTimeout(resolve, 200));
+        let stage = 'image';
+        try {
+          const image = container.images.server;
+          if (!image) throw new Error('Container image missing');
+          // New Worker versions must not keep serving an older image indefinitely.
+          stage = 'inspect';
+          if (container.running && (await container.inspect())?.image !== image) {
+            await container.destroy();
           }
-        }
+          stage = 'start';
+          if (!container.running) {
+            container.start({
+              image, instance: 'lite', enableInternet: true,
+              env: {
+                INTERVALS_ICU_API_KEY: this.env.INTERVALS_ICU_API_KEY,
+                INTERVALS_ICU_ATHLETE_ID: this.env.INTERVALS_ICU_ATHLETE_ID,
+                ICUVISOR_TIMEZONE: this.env.ICUVISOR_TIMEZONE,
+                ICUVISOR_DELETE_MODE: 'none',
+                ICUVISOR_TOOLSET: this.env.ICUVISOR_TOOLSET,
+                ICUVISOR_COACH_MODE: 'off',
+              },
+            });
+          }
+          stage = 'timeout';
+          await container.setInactivityTimeout(IDLE_TIMEOUT_MS);
+          stage = 'readiness';
+          const deadline = Date.now() + 30_000;
+          for (;;) {
+            try {
+              // An unauthenticated GET to a non-MCP path only checks HTTP readiness.
+              // A 404 is sufficient; never retry an actual MCP request.
+              const response = await container.getTcpPort(8080).fetch('http://localhost:8080/', {
+                signal: AbortSignal.timeout(2000), redirect: 'manual',
+              });
+              await response.body?.cancel();
+              return;
+            } catch {
+              if (Date.now() >= deadline) throw new Error('Container startup timed out');
+              await new Promise(resolve => setTimeout(resolve, 200));
+            }
+          }
+        } catch { throw new Error(`MCP_CONTAINER_${stage}`); }
       })();
     }
     const pending = this.ready;

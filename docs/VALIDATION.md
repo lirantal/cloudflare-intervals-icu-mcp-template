@@ -1,6 +1,6 @@
 # Validation status — 2026-10-27
 
-The full MCP Worker and container image are **deployed** to the authorized example-account account. Public HTTP smoke testing, real ChatGPT OAuth/tool discovery, and real non-owner rejection are **not yet verified**.
+The full MCP Worker and container image are **deployed** to the authorized example-account account. Real GitHub OAuth sign-in through ChatGPT has succeeded. Public HTTP smoke testing, real ChatGPT tool discovery, and real non-owner rejection are **not yet verified**.
 
 ## Production state
 
@@ -19,7 +19,7 @@ The full MCP Worker and container image are **deployed** to the authorized examp
 
 - Node 24.22.0 and official `cf` 1.0.0-beta.23; dependencies installed with `npm ci`.
 - `npm run check` passes.
-- `npm test` passes: **19 tests**. Sixteen use real OAuth provider code in Miniflare/workerd with stub GitHub/container endpoints. Two of those sixteen drive the rendered consent page in Chromium through a loopback bridge to the real workerd fixture, intercepting GitHub/ChatGPT requests before network access. Three other tests cover native container lifecycle behavior with mocked runtime APIs.
+- `npm test` passes: **20 tests**. Seventeen use real OAuth provider code in Miniflare/workerd with stub GitHub/container endpoints. Two of those sixteen drive the rendered consent page in Chromium through a loopback bridge to the real workerd fixture, intercepting GitHub/ChatGPT requests before network access. Three other tests cover native container lifecycle behavior with mocked runtime APIs.
 - OAuth coverage includes discovery, issuer identification, DCR callback restrictions, anonymous/forged bearer rejection, S256 PKCE, canonical audience, consent cancellation/browser binding, non-owner denial, owner authorization, credential stripping, session headers, Origin rejection, refresh/revocation, code replay, and authorization-version/scope policy.
 - Lifecycle coverage includes shared startup for concurrent requests, pinned image/lite instance selection, read-only runtime settings, native inactivity timeout restoration, replacement of an old image, and no replay of interrupted MCP calls.
 - Docker builds the pinned icuvisor commit `069f893e91819a454da80015df8f2ae6158707ae` using Go 1.26.10. Local Linux amd64 image: `sha256:6c950978f33eae9ab2674e71df89b1e1c0f7a89ef95ff2fe21345e06e16c2356`.
@@ -89,3 +89,21 @@ Two automated Chromium tests against the actual rendered workerd/provider fixtur
 The same browser tests pass after the CSP change. All **19 tests**, TypeScript checks, full build, and prebuilt dry run pass. The browser harness uses the system Chromium/Chrome binary (or `CHROMIUM_BIN`) and Node's built-in CDP WebSocket client; it forwards only loopback traffic to the test fixture and intercepts external navigation locally without real GitHub/ChatGPT access. CI and deployment workflows require the browser tests via `REQUIRE_BROWSER_TESTS=true` instead of silently skipping when no browser is available. Real account sign-in/tool discovery still require user acceptance with a fresh OAuth flow.
 
 CSP redirect fix deployed as version `REDACTED_DEPLOYMENT_VERSION`; Cloudflare deployments API confirms 100% traffic.
+
+## Live authentication accepted; discovery under investigation
+
+The user completed real GitHub OAuth consent and returned to ChatGPT successfully. ChatGPT reports OAuth authentication succeeded, but action discovery failed and Refresh tools did not recover it. Cloudflare's instance API reports the single named `owner` container running. A local image startup with the same non-secret runtime settings and dummy API key registers 22 read-only tools.
+
+Temporary diagnostic version `REDACTED_DEPLOYMENT_VERSION` was deployed. Diagnostics are limited to owner-authorized initialization, initialized notification, tools/list, and GET stream categories. Fixed metadata only (phase, HTTP status, response media category, session-header presence, elapsed time, and fixed failure-stage code) is stored in four fixed KV keys with a 600-second TTL. No request/response body, full URL, token, cookie/header value, session identifier, tool arguments, or health data is stored. The diagnostic feature also stops automatically at `MCP_DIAGNOSTICS_UNTIL`; remove/disable it after diagnosis. An integration assertion verifies the exact diagnostic fields, and all 19 tests/type checking/build/dry run passed before deployment. The user has been asked to click Refresh tools once to populate these records. Public executor access remains blocked by the environment allowlist.
+
+The first refresh after diagnostic deployment produced no recognized authenticated MCP records. A broader probe was deployed as version `REDACTED_DEPLOYMENT_VERSION`: it records MCP entry-point HTTP status/outcome, credential-header presence (boolean only), and an origin category, plus an `other` MCP method category. Tests assert exact diagnostic fields for anonymous 401 and authenticated forwarding. All 19 tests, type checking, build, and dry run pass. User has been asked to refresh once more; cause is not established yet.
+
+## Modern MCP header forwarding defect
+
+A refresh produced an authenticated gateway POST with HTTP 400 JSON, no session response header, and no container exception. The original method classifier did not recognize the request as legacy initialize/tools/list. The user also saw ChatGPT's refresh endpoint return 424; blocked browser telemetry requests do not account for the authenticated backend 400.
+
+Inspection of the pinned Go SDK found that modern `server/discover` requires the `Mcp-Method` header. The proxy's old header allowlist dropped it. A real-container reproduction using the 2026-07-28 discovery metadata returned HTTP 400 JSON-RPC code -32020 (`missing required Mcp-Method header`) without that header, and HTTP 200 with supported stateful protocol versions when it was retained. The live structural record has not yet established the exact request method; the defect itself is reproduced independently.
+
+The proxy now preserves `Mcp-Method`, `Mcp-Name`, and the standard `Mcp-Param-*` header family while still stripping credentials, cookies, unrelated mcp-* fields, and forwarding headers. A real-provider integration test verifies these forwarding/stripping rules. The real-container smoke test now checks modern server/discover as well as legacy initialization and 22 read-only tools, with a dummy key and no intervals.icu API calls. Type checking and all 20 tests pass. Existing short-lived diagnostics remain enabled for the acceptance attempt and must be disabled/removed after diagnosis.
+
+Protocol-header fix deployed as version `REDACTED_DEPLOYMENT_VERSION`; deployments API confirms 100% traffic. Build and dry run pass. User has been asked to Refresh tools on the existing authenticated app. The bounded diagnostics now recognize server/discover and 2026-07-28 structural metadata without persisting request values.
