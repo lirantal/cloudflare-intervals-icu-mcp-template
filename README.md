@@ -1,21 +1,52 @@
-# ICU Visor MCP on Cloudflare
+# Intervals.icu MCP · Cloudflare deployment template
 
-Run a private, single-owner [icuvisor](https://github.com/ricardocabral/icuvisor) MCP server for intervals.icu on Cloudflare. A Worker uses Cloudflare's [Workers OAuth Provider](https://github.com/cloudflare/workers-oauth-provider) to authenticate ChatGPT, identifies the owner through GitHub, and proxies authorized requests to a Go container. Training data access is **read-only**.
+[![CI](https://github.com/lirantal/cloudflare-intervals-icu-mcp-template/actions/workflows/ci.yml/badge.svg)](https://github.com/lirantal/cloudflare-intervals-icu-mcp-template/actions/workflows/ci.yml)
+[![Cloudflare Workers + Containers](https://img.shields.io/badge/Cloudflare-Workers%20%2B%20Containers-F38020?logo=cloudflare&logoColor=white)](https://developers.cloudflare.com/containers/)
+[![Access: read-only](https://img.shields.io/badge/access-read--only-22863a)](#security-and-design-constraints)
+[![Gateway license: Apache-2.0](https://img.shields.io/badge/gateway_license-Apache--2.0-blue)](LICENSE)
 
-The deployment has been exercised with real GitHub OAuth, ChatGPT tool discovery, and a user-confirmed data query. It exposes 22 read-only tools with the default core toolset. See [validation and remaining checks](docs/VALIDATION.md).
+**A self-deployable Cloudflare template that connects ChatGPT to your [Intervals.icu](https://intervals.icu) training data through MCP.**
+
+Deploy a private, single-owner gateway in your own Cloudflare account. GitHub sign-in restricts access to you; [ICU Visor](https://github.com/ricardocabral/icuvisor), the Go MCP server inside the container, provides **22 read-only tools** with the default core toolset.
+
+**Your Cloudflare account · Your GitHub identity · Your Intervals.icu API key**
+
+[Self-deploy](#self-deploy-on-cloudflare) · [Architecture](#architecture-at-a-glance) · [Connect ChatGPT](#connect-chatgpt) · [Documentation](#documentation)
+
+## Architecture at a glance
 
 ```mermaid
 flowchart LR
-  C[ChatGPT] -->|OAuth and MCP| W[Cloudflare Worker]
-  B[Owner browser] -->|Consent and GitHub sign-in| W
-  W <-->|Identity verification| G[GitHub OAuth App]
-  W <-->|Clients and grants| K[OAuth KV]
-  W -->|One named owner instance| D[SQLite Durable Object]
-  D --> V[Go icuvisor container]
-  V -->|Runtime API key; read-only tools| I[intervals.icu]
+  C[ChatGPT] -->|OAuth + MCP| W[Cloudflare Worker]
+  B[Owner browser] -->|Consent + sign-in| W
+  W <-->|Verify owner identity| G[GitHub OAuth App]
+  W <-->|Clients + grants| K[OAuth KV]
+  W -->|Authorized MCP requests| D[Owner Durable Object]
+  D --> V[ICU Visor / Go container]
+  V -->|API key / read-only tools| I[Intervals.icu API]
 ```
 
-## Getting started: self-host this template
+| Component | Role |
+| --- | --- |
+| **Worker + OAuth Provider** | Public entry point; handles consent, OAuth tokens, owner checks, and MCP proxying. |
+| **GitHub OAuth App** | Verifies the configured owner's numeric GitHub identity. |
+| **OAuth KV** | Stores OAuth clients and authorization grants. |
+| **SQLite Durable Object + Container** | Routes to one named owner instance and manages the ICU Visor container lifecycle. |
+| **Intervals.icu** | Source of athlete and training data, accessed with a runtime API key. |
+
+The Worker is the only public application ingress. It checks authorization before forwarding MCP requests; the container has no separate public endpoint. See [architecture and trust boundaries](docs/ARCHITECTURE.md) for the full flow.
+
+## Self-deploy on Cloudflare
+
+This repository supplies the deployment template; you provision and operate your own instance. **Workers Paid with Containers is required**, and the deployment incurs Cloudflare usage charges. Single-owner routing and idle sleep are not a spending cap.
+
+Before starting, have:
+
+- A Cloudflare account with Workers Paid/Containers.
+- A GitHub account and a GitHub **OAuth App** for owner sign-in.
+- An Intervals.icu account, athlete ID, and API key.
+
+### Set up with a coding agent
 
 Fork this repository, then give your coding agent this instruction:
 
@@ -26,12 +57,17 @@ Fork this repository, then give your coding agent this instruction:
 > entry. Confirm my account and paid provisioning before the first deployment.
 
 The [step-by-step agent runbook](AGENTS.md#end-to-end-self-hosting-setup) covers
-setup through real ChatGPT acceptance. You need a Cloudflare account with Workers
-Paid/Containers, a GitHub identity and OAuth App, and an intervals.icu account/API
-key. Keep your settings in ignored `deployment.local.json`; keep the committed
-template generic. Existing deployments should use the runbook's resume path.
+setup through real ChatGPT acceptance. Keep your settings in ignored
+`deployment.local.json`; keep the committed template generic. Existing deployments
+should use the runbook's resume path. For manual setup, follow the
+[deployment guide](docs/DEPLOYMENT.md).
 
 ## Documentation
+
+The deployment has been exercised with real GitHub OAuth, ChatGPT tool discovery,
+and a user-confirmed data query. This records validation of an existing instance;
+your deployment still needs its own acceptance checks. See
+[validation and remaining checks](docs/VALIDATION.md).
 
 - [Architecture, trust boundaries, and source provenance](docs/ARCHITECTURE.md)
 - [Requirements, OAuth App setup, secrets, and deployment](docs/DEPLOYMENT.md)
@@ -79,7 +115,7 @@ Create a custom app/connector with the URL **`PUBLIC_ORIGIN/mcp`** and authentic
 
 Use **Refresh tools**, then **Try in chat**. Ask the app to fetch your athlete profile or list a few recent activities using its tools. Verify the visible tool call and compare its result with intervals.icu. Never use a correct-looking prose answer alone as evidence of a server call. Also complete the [real non-owner denial check](docs/OPERATIONS.md#acceptance-checks).
 
-## Design constraints
+## Security and design constraints
 
 - Standards-based OAuth discovery, dynamic registration, explicit consent, S256 PKCE, canonical audience validation, token refresh, and authorization-version invalidation.
 - `deleteMode: none` is checked before deployment and at Worker runtime; the container also hard-codes read-only registration and disables coach mode.
