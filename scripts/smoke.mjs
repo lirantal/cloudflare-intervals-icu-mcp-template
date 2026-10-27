@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-const origin=process.argv[2];
+import settings from '../deployment.config.ts';
+const origin=process.argv[2] || settings.publicOrigin;
 if(!origin || new URL(origin).origin!==origin || !origin.startsWith('https://'))throw Error('Usage: npm run smoke -- https://YOUR-WORKER.workers.dev');
 const request=async(path,options={})=>fetch(origin+path,{...options,redirect:'manual',signal:AbortSignal.timeout(20000)});
 const prm=await request('/.well-known/oauth-protected-resource/mcp');assert.equal(prm.status,200);

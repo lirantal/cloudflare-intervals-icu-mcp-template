@@ -1,5 +1,5 @@
 import { bindings, defineConfig, defineContainer, exports } from 'cf/config';
-import settings from './deployment.json' with { type: 'json' };
+import settings from './deployment.config.ts';
 
 const container = defineContainer({
   name: `${settings.workerName}-server`,

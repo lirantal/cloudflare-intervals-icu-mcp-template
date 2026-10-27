@@ -21,19 +21,35 @@ jobs:
           node-version-file: .node-version
           cache: npm
       - run: npm ci
+      - run: npm run check:public
+      - name: Restore private deployment settings
+        env:
+          ICUVISOR_DEPLOYMENT_JSON: ${{ secrets.ICUVISOR_DEPLOYMENT_JSON }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { writeFileSync } from 'node:fs';
+          if (!process.env.ICUVISOR_DEPLOYMENT_JSON) throw new Error('Configure the production ICUVISOR_DEPLOYMENT_JSON secret first');
+          let settings;
+          try { settings = JSON.parse(process.env.ICUVISOR_DEPLOYMENT_JSON); }
+          catch { throw new Error('Private deployment settings must be valid JSON'); }
+          if (!settings || typeof settings !== 'object' || Array.isArray(settings)) throw new Error('Private deployment settings must be an object');
+          for (const value of Object.values(settings)) if (typeof value === 'string') {
+            console.log('::add-mask::' + value.replaceAll('%', '%25').replaceAll('\r', '%0D').replaceAll('\n', '%0A'));
+          }
+          writeFileSync('deployment.local.json', JSON.stringify(settings, null, 2) + '\n', { mode: 0o600 });
+          NODE
       - run: npm run preflight
       - run: npm run check
       - run: npm test
       - run: npm run build
       - run: npx cf deploy --prebuilt --mode production --dry-run
-      - run: docker build -t example-account-icuvisor:test .
+      - run: docker build -t icuvisor-mcp:test .
       - run: npm run test:container
       - name: Deploy the verified build
         run: npm run deploy -- --prebuilt --mode production
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: REPLACE
           GITHUB_CLIENT_SECRET: ${{ secrets.OAUTH_GITHUB_CLIENT_SECRET }}
           INTERVALS_ICU_API_KEY: ${{ secrets.INTERVALS_ICU_API_KEY }}
       - name: Check public discovery and rejection of anonymous callers
-        run: node scripts/smoke.mjs "$(node -p 'JSON.parse(require("fs").readFileSync("deployment.json")).publicOrigin')"
+        run: npm run smoke

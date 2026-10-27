@@ -1,5 +1,5 @@
 {
-  "name": "icuvisor-mcp",
+  "name": "icuvisor-cloudflare-mcp",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -14,10 +14,10 @@
     "test": "vitest run",
     "preflight": "node scripts/preflight.mjs",
     "smoke": "node scripts/smoke.mjs",
-    "test:container": "node scripts/container-smoke.mjs"
+    "test:container": "node scripts/container-smoke.mjs",
+    "check:public": "node scripts/check-public.mjs"
   },
   "dependencies": {
-    "@cloudflare/containers": "0.3.7",
     "@cloudflare/workers-oauth-provider": "1.2.4"
   },
   "devDependencies": {

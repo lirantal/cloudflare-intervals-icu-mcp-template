@@ -65,7 +65,7 @@ export async function login(request: Request, env: Env): Promise<Response> {
       const token = await tokenResponse.json() as {access_token?:string};
       if (!token.access_token) return deny();
       const userResponse = await fetch('https://api.github.com/user', {
-        headers:{accept:'application/vnd.github+json', authorization:`Bearer ${token.access_token}`, 'user-agent':'icuvisor-mcp'},
+        headers:{accept:'application/vnd.github+json', authorization:`Bearer ${token.access_token}`, 'user-agent':'icuvisor-cloudflare-mcp'},
         redirect:'manual',signal:AbortSignal.timeout(15000),
       });
       if (!userResponse.ok) return new Response('GitHub identity unavailable', {status:502,headers:saved.headers});

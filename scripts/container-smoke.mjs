@@ -1,7 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import assert from 'node:assert/strict';
-const image=process.argv[2] || 'example-account-icuvisor:test';
+const image=process.argv[2] || 'icuvisor-mcp:test';
 const name='icuvisor-smoke-'+randomUUID();
 const docker=(args)=>{const r=spawnSync('docker',args,{encoding:'utf8'});if(r.status!==0)throw Error(r.stderr||'Docker command failed');return r.stdout.trim();};
 const parse=async r=>{assert.ok(r.ok,`MCP HTTP ${r.status}: ${await r.clone().text()}`);const text=await r.text();if(r.headers.get('content-type')?.includes('text/event-stream'))return JSON.parse(text.split('\n').find(l=>l.startsWith('data:'))?.slice(5)||'null');return JSON.parse(text);};
