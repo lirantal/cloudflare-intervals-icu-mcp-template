@@ -115,12 +115,12 @@ describe('OAuth protocol and owner gate',()=>{
     const flow=await begin();
     const result=await browserConsent(call,`/authorize?${flow.params}`,'approve');
     expect(result.destination).toBe('https://github.com');
-  },30000);
+  },60000);
   it.skipIf(!chromium)('browser follows consent cancellation redirect to ChatGPT', async()=>{
     const flow=await begin();
     const result=await browserConsent(call,`/authorize?${flow.params}`,'deny');
     expect(result.destination).toBe('https://chatgpt.com');
-  },30000);
+  },60000);
   it('cancels consent before any upstream identity request',async()=>{
     const f=await begin();const consent=await call(`/authorize?${f.params}`);
     const handle=(await consent.text()).match(/name="handle" value="([^"]+)"/)![1];

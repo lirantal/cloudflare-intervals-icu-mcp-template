@@ -8,6 +8,38 @@ export const chromium = process.env.CHROMIUM_BIN || ['chromium', 'chromium-brows
 
 if (process.env.REQUIRE_BROWSER_TESTS === 'true' && !chromium) throw new Error('Install Chromium/Chrome or set CHROMIUM_BIN; browser tests are required');
 
+// Exported so launcher failures can be tested without starting a real browser.
+export function waitForChromium(child: ReturnType<typeof spawn>, executable: string, timeoutMs=30000): Promise<string> {
+  return new Promise<string>((resolve,reject)=>{
+    // Startup happens before navigation, so these bounded diagnostics contain no
+    // consent URLs, cookies, or application request data.
+    let stderr='';
+    const cleanup=()=>{
+      clearTimeout(timer);
+      child.off('error',onError);
+      child.off('exit',onExit);
+      child.stderr!.off('data',onData);
+      child.stderr!.resume();
+    };
+    const fail=(reason:string)=>{
+      cleanup();
+      reject(Error(`${reason} (${executable})\n${stderr.trim() || 'No Chromium stderr captured'}`));
+    };
+    const onError=(error:Error)=>fail(`Chromium failed to launch: ${error.message}`);
+    const onExit=(code:number|null,signal:NodeJS.Signals|null)=>fail(`Chromium exited before DevTools was ready: code=${code}, signal=${signal}`);
+    const onData=(data:Buffer)=>{
+      stderr=(stderr+String(data)).slice(-16384);
+      // Wait for the line ending: both the prefix and URL can span chunks.
+      const match=stderr.match(/DevTools listening on (ws:\/\/[^\s]+)[\r\n]/);
+      if(match){cleanup();resolve(match[1]);}
+    };
+    const timer=setTimeout(()=>fail(`Chromium did not start within ${timeoutMs}ms`),timeoutMs);
+    child.once('error',onError);
+    child.once('exit',onExit);
+    child.stderr!.on('data',onData);
+  });
+}
+
 // Loopback bridge to the real workerd fixture. Only the test origin is translated;
 // GitHub/ChatGPT navigations are intercepted by CDP and never reach the Internet.
 export async function browserConsent(
@@ -36,11 +68,7 @@ export async function browserConsent(
   const child=spawn(chromium,['--headless','--no-sandbox','--disable-background-networking','--disable-dev-shm-usage','--no-first-run','--disable-extensions',`--user-data-dir=${directory}`,'--remote-debugging-port=0','about:blank'],{stdio:['ignore','ignore','pipe']});
   let socket:WebSocket|undefined;
   try {
-    const endpoint=await new Promise<string>((resolve,reject)=>{
-      const timer=setTimeout(()=>reject(Error('Chromium did not start')),10000);
-      child.on('error',reject);
-      child.stderr.on('data',data=>{const match=String(data).match(/DevTools listening on (ws:\/\/\S+)/);if(match){clearTimeout(timer);resolve(match[1]);}});
-    });
+    const endpoint=await waitForChromium(child,chromium);
     socket=new WebSocket(endpoint);await new Promise<void>((resolve,reject)=>{socket!.addEventListener('open',()=>resolve(),{once:true});socket!.addEventListener('error',()=>reject(Error('CDP connection failed')),{once:true});});
     let id=0;
     const pending=new Map<number,{resolve:(value:any)=>void;reject:(error:Error)=>void}>();
@@ -76,7 +104,7 @@ export async function browserConsent(
     } finally {clearTimeout(timer);}
   } finally {
     socket?.close();child.kill('SIGTERM');
-    await new Promise<void>(resolve=>{if(child.exitCode!==null)resolve();else {child.once('exit',()=>resolve());setTimeout(()=>{child.kill('SIGKILL');resolve();},1000).unref();}});
+    await new Promise<void>(resolve=>{if(child.exitCode!==null || child.signalCode!==null)resolve();else {child.once('exit',()=>resolve());setTimeout(()=>{child.kill('SIGKILL');resolve();},1000).unref();}});
     server.closeAllConnections();await new Promise<void>(resolve=>server.close(()=>resolve()));
     await rm(directory,{recursive:true,force:true,maxRetries:3,retryDelay:100});
   }
