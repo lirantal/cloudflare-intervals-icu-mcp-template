@@ -15,7 +15,23 @@ flowchart LR
   V -->|Runtime API key; read-only tools| I[intervals.icu]
 ```
 
-## Start here
+## Getting started: self-host this template
+
+Fork this repository, then give your coding agent this instruction:
+
+> Inspect this repository and follow AGENTS.md's “End-to-end self-hosting setup”
+> to deploy my own read-only intervals.icu MCP server to my Cloudflare account.
+> Automate the implementation, checks, configuration, and deployment. Guide me
+> through browser authorization, GitHub OAuth App creation, and secure secret
+> entry. Confirm my account and paid provisioning before the first deployment.
+
+The [step-by-step agent runbook](AGENTS.md#end-to-end-self-hosting-setup) covers
+setup through real ChatGPT acceptance. You need a Cloudflare account with Workers
+Paid/Containers, a GitHub identity and OAuth App, and an intervals.icu account/API
+key. Keep your settings in ignored `deployment.local.json`; keep the committed
+template generic. Existing deployments should use the runbook's resume path.
+
+## Documentation
 
 - [Architecture, trust boundaries, and source provenance](docs/ARCHITECTURE.md)
 - [Requirements, OAuth App setup, secrets, and deployment](docs/DEPLOYMENT.md)
